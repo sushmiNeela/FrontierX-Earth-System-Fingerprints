@@ -71,7 +71,12 @@ SUPPORTED_PRODUCTS = {
 # VERIFIED NASA TASK DOWNLOAD ROUTING
 # ============================================================
 
-DATA_ROOT = Path(r"E:\EarthSystemFingerprintsData\raw\appeears")
+DATA_ROOT = Path(
+    os.getenv(
+        "APPEEARS_DATA_ROOT",
+        "E:/EarthSystemFingerprintsData/raw/appeears"
+    )
+)
 
 TASK_DOWNLOAD_DIRECTORIES = {
     "934b1497-cb1a-4018-89dc-74d3aedb179f": "Bangladesh_LST",
@@ -111,15 +116,21 @@ app = FastAPI(
     version="1.4.0",
 )
 
+allowed_origins = [
+    f"http://localhost:{port}"
+    for port in range(5100, 5200)
+] + [
+    f"http://127.0.0.1:{port}"
+    for port in range(5100, 5200)
+] + [
+    origin.strip()
+    for origin in os.getenv("FRONTEND_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        f"http://localhost:{port}"
-        for port in range(5100, 5200)
-    ] + [
-        f"http://127.0.0.1:{port}"
-        for port in range(5100, 5200)
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1999,5 +2010,3 @@ def igp_sm_trend():
     result["task_id"] = "0dbce586-3f48-4178-817a-0436429d080f"
 
     return result
-
-

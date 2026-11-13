@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Database,
@@ -35,6 +36,30 @@ type Dataset = {
   icon: typeof Thermometer;
   source: string;
 };
+
+type NASAProduct = {
+  Product: string;
+  Platform: string;
+  Description: string;
+  Resolution: string;
+  TemporalGranularity: string;
+  Version: string;
+  Available: boolean;
+  DocLink: string;
+  Source: string;
+  TemporalExtentStart: string;
+  TemporalExtentEnd: string;
+  ProductAndVersion: string;
+  project_variable: string;
+};
+
+type NASAResponse = {
+  source: string;
+  supported_product_count: number;
+  products: NASAProduct[];
+};
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const datasets: Dataset[] = [
   {
@@ -98,17 +123,70 @@ const datasets: Dataset[] = [
     use: "Examining soil-moisture variability and its relationship with vegetation and land-surface temperature.",
     color: "blue",
     icon: Droplets,
-    source: "https://nsidc.org/data/spl3smp_e",
+    source: "https://doi.org/10.5067/M20OXIZHY3RJ",
   },
 ];
 
 const filters = ["All", "LST", "NDVI", "Soil Moisture"] as const;
+
+function formatResolution(value: string) {
+  if (value === "1000m") return "1 km";
+  if (value === "250m") return "250 m";
+  if (value === "9000m") return "Approximately 9 km";
+  return value;
+}
+
+function formatTemporal(value: string) {
+  if (value === "16 day") return "16-day composite";
+  return value;
+}
 
 export default function DatasetCatalog() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] =
     useState<(typeof filters)[number]>("All");
   const [selectedId, setSelectedId] = useState("mod11");
+
+  const [liveProducts, setLiveProducts] = useState<NASAProduct[]>([]);
+  const [apiSource, setApiSource] = useState("NASA AppEEARS");
+  const [apiStatus, setApiStatus] = useState<
+    "loading" | "connected" | "error"
+  >("loading");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadNASAProducts() {
+      try {
+        const response = await fetch(`${API_BASE}/api/nasa/products`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`NASA API request failed: ${response.status}`);
+        }
+
+        const data: NASAResponse = await response.json();
+
+        if (!Array.isArray(data.products)) {
+          throw new Error("Invalid NASA product response");
+        }
+
+        setLiveProducts(data.products);
+        setApiSource(data.source || "NASA AppEEARS");
+        setApiStatus("connected");
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+
+        console.error("NASA catalogue error:", error);
+        setApiStatus("error");
+      }
+    }
+
+    loadNASAProducts();
+
+    return () => controller.abort();
+  }, []);
 
   const filteredDatasets = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -133,6 +211,23 @@ export default function DatasetCatalog() {
 
   const SelectedIcon = selectedDataset.icon;
 
+  const getLiveProduct = (productId: string) =>
+    liveProducts.find((product) => product.Product === productId);
+
+  const selectedLiveProduct = getLiveProduct(selectedDataset.product);
+
+  const getResolution = (dataset: Dataset) => {
+    const live = getLiveProduct(dataset.product);
+    return live ? formatResolution(live.Resolution) : dataset.resolution;
+  };
+
+  const getTemporal = (dataset: Dataset) => {
+    const live = getLiveProduct(dataset.product);
+    return live
+      ? formatTemporal(live.TemporalGranularity)
+      : dataset.temporal;
+  };
+
   return (
     <div className="page-content dataset-page">
       <div className="dataset-heading">
@@ -143,6 +238,37 @@ export default function DatasetCatalog() {
             Explore the satellite products used to investigate environmental
             changes across the selected study regions.
           </p>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginTop: "12px",
+              fontSize: "12px",
+            }}
+          >
+            <span
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background:
+                  apiStatus === "connected"
+                    ? "#35c98b"
+                    : apiStatus === "error"
+                      ? "#ef6464"
+                      : "#e5ad42",
+              }}
+            />
+            <span>
+              {apiStatus === "connected"
+                ? `Live connection: ${apiSource}`
+                : apiStatus === "error"
+                  ? "NASA API connection unavailable — showing reference metadata"
+                  : "Connecting to NASA AppEEARS..."}
+            </span>
+          </div>
         </div>
 
         <div className="dataset-heading-icon">
@@ -243,6 +369,7 @@ export default function DatasetCatalog() {
             {filteredDatasets.length > 0 ? (
               filteredDatasets.map((dataset) => {
                 const Icon = dataset.icon;
+                const live = getLiveProduct(dataset.product);
 
                 return (
                   <button
@@ -262,23 +389,40 @@ export default function DatasetCatalog() {
                           {dataset.variable}
                         </span>
                         <span className="dataset-product">
-                          {dataset.shortName}
+                          {live?.ProductAndVersion || dataset.shortName}
                         </span>
                       </div>
 
                       <h3>{dataset.name}</h3>
-                      <p>{dataset.provider}</p>
+                      <p>{live?.Platform || dataset.provider}</p>
 
                       <div className="dataset-card-meta">
                         <span>
                           <MapPin size={13} />
-                          {dataset.resolution}
+                          {getResolution(dataset)}
                         </span>
                         <span>
                           <CalendarDays size={13} />
-                          {dataset.temporal}
+                          {getTemporal(dataset)}
                         </span>
                       </div>
+
+                      {apiStatus === "connected" && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            marginTop: "8px",
+                            fontSize: "11px",
+                            color: live?.Available ? "#35c98b" : "#ef6464",
+                          }}
+                        >
+                          {live
+                            ? live.Available
+                              ? "NASA catalogue: Available"
+                              : "NASA catalogue: Unavailable"
+                            : "Not returned by NASA API"}
+                        </span>
+                      )}
                     </div>
 
                     <ChevronRight
@@ -314,7 +458,10 @@ export default function DatasetCatalog() {
                 <span className="dataset-detail-label">
                   SELECTED DATASET
                 </span>
-                <h2>{selectedDataset.shortName}</h2>
+                <h2>
+                  {selectedLiveProduct?.ProductAndVersion ||
+                    selectedDataset.shortName}
+                </h2>
               </div>
             </div>
 
@@ -322,6 +469,30 @@ export default function DatasetCatalog() {
             <p className="dataset-detail-description">
               {selectedDataset.description}
             </p>
+
+            {apiStatus === "connected" && selectedLiveProduct && (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  marginTop: "12px",
+                  borderRadius: "8px",
+                  background: "rgba(53, 201, 139, 0.08)",
+                  fontSize: "12px",
+                }}
+              >
+                <strong style={{ color: "#35c98b" }}>
+                  NASA AppEEARS metadata received
+                </strong>
+                <p style={{ margin: "5px 0 0" }}>
+                  Catalogue availability:{" "}
+                  {selectedLiveProduct.Available ? "Available" : "Unavailable"}
+                </p>
+                <p style={{ margin: "4px 0 0" }}>
+                  Data period: {selectedLiveProduct.TemporalExtentStart} —{" "}
+                  {selectedLiveProduct.TemporalExtentEnd}
+                </p>
+              </div>
+            )}
 
             <div className="dataset-detail-divider" />
 
@@ -333,19 +504,26 @@ export default function DatasetCatalog() {
             <div className="dataset-metadata-grid">
               <div>
                 <span>Product ID</span>
-                <strong>{selectedDataset.product}</strong>
+                <strong>
+                  {selectedLiveProduct?.ProductAndVersion ||
+                    selectedDataset.product}
+                </strong>
               </div>
               <div>
                 <span>Collection</span>
-                <strong>{selectedDataset.collection}</strong>
+                <strong>
+                  {selectedLiveProduct
+                    ? `Version ${selectedLiveProduct.Version}`
+                    : selectedDataset.collection}
+                </strong>
               </div>
               <div>
                 <span>Spatial resolution</span>
-                <strong>{selectedDataset.resolution}</strong>
+                <strong>{getResolution(selectedDataset)}</strong>
               </div>
               <div>
                 <span>Temporal resolution</span>
-                <strong>{selectedDataset.temporal}</strong>
+                <strong>{getTemporal(selectedDataset)}</strong>
               </div>
               <div>
                 <span>Measurement unit</span>
@@ -365,6 +543,22 @@ export default function DatasetCatalog() {
                   {selectedDataset.layer}
                 </strong>
               </div>
+              {selectedLiveProduct && (
+                <>
+                  <div>
+                    <span>NASA data provider</span>
+                    <strong>{selectedLiveProduct.Source}</strong>
+                  </div>
+                  <div>
+                    <span>NASA catalogue status</span>
+                    <strong>
+                      {selectedLiveProduct.Available
+                        ? "Available"
+                        : "Unavailable"}
+                    </strong>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="dataset-use-box">
@@ -377,7 +571,9 @@ export default function DatasetCatalog() {
 
             <a
               className="dataset-source-link"
-              href={selectedDataset.source}
+              href={
+                selectedLiveProduct?.DocLink || selectedDataset.source
+              }
               target="_blank"
               rel="noreferrer"
             >
@@ -393,11 +589,11 @@ export default function DatasetCatalog() {
         <div>
           <strong>Data integrity notice</strong>
           <p>
-            This catalog documents the products planned for the project. It
-            does not indicate that all observations have been downloaded,
-            quality-filtered, processed or integrated into the application.
-            Product-specific scale factors, quality flags and valid-data rules
-            must be applied during data processing.
+            NASA AppEEARS provides live product catalogue metadata. Catalogue
+            availability does not mean that all observations have been
+            downloaded, quality-filtered, processed or integrated into this
+            application. Product-specific scale factors, quality flags and
+            valid-data rules must be applied during data processing.
           </p>
         </div>
       </div>
