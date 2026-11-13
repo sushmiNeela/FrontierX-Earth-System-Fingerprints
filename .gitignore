@@ -1,0 +1,50 @@
+﻿# Secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# Local data and generated files
+data/
+*.log
+*.tmp
+*.bak
+*.backup
+*.before-*
+backend/tasks_now.json
+
+# Investigation-only scripts
+backend/audit_*.py
+backend/inspect_*.py
+backend/check_*.py
+backend/compare_*.py
+backend/diagnose_*.py
+backend/verify_*.py
+backend/test_*.py
+
+# Backups and duplicate archives
+backup_before_final_integration/
+frontend/src-code.zip
+*.zip
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

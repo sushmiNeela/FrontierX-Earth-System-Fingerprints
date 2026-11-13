@@ -1,0 +1,22 @@
+.earth-globe-container {
+  width: 100%;
+  height: 560px;
+  min-height: 400px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #050b16;
+}
+
+.earth-globe-container canvas {
+  outline: none;
+}
+
+.earth-globe-container .cesium-viewer {
+  width: 100%;
+  height: 100%;
+}
+
+.earth-globe-container .cesium-viewer-bottom {
+  font-size: 10px;
+}
