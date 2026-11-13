@@ -1,4 +1,6 @@
-fastapi
+﻿fastapi
 uvicorn[standard]
 requests
 python-dotenv
+numpy
+scipy
