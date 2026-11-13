@@ -410,50 +410,48 @@ export default function FingerprintStudio() {
 
     setResults(initial);
 
-    const requests = datasetSpecs
-      .filter(
-        (spec) =>
-          spec.availability === "available" && spec.endpoint,
-      )
-      .map(async (spec) => {
-        try {
-          const response = await fetch(`${API_BASE}${spec.endpoint}`);
+    const loaded: Array<{ key: string; result: DatasetResult }> = [];
 
-          if (!response.ok) {
-            throw new Error(
-              `Backend returned HTTP ${response.status}`,
-            );
-          }
+    for (const spec of datasetSpecs) {
+      if (spec.availability !== "available" || !spec.endpoint) {
+        continue;
+      }
 
-          const json: unknown = await response.json();
+      try {
+        const response = await fetch(`${API_BASE}${spec.endpoint}`);
 
-          if (!isRecord(json)) {
-            throw new Error("Unexpected statistics response format.");
-          }
-
-          return {
-            key: spec.key,
-            result: {
-              state: "success" as const,
-              data: json,
-            },
-          };
-        } catch (error) {
-          return {
-            key: spec.key,
-            result: {
-              state: "error" as const,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Unable to load statistics.",
-            },
-          };
+        if (!response.ok) {
+          throw new Error(
+            `Backend returned HTTP ${response.status}`,
+          );
         }
-      });
 
-    const loaded = await Promise.all(requests);
+        const json: unknown = await response.json();
 
+        if (!isRecord(json)) {
+          throw new Error("Unexpected statistics response format.");
+        }
+
+        loaded.push({
+          key: spec.key,
+          result: {
+            state: "success",
+            data: json,
+          },
+        });
+      } catch (error) {
+        loaded.push({
+          key: spec.key,
+          result: {
+            state: "error",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Unable to load statistics.",
+          },
+        });
+      }
+    }
     setResults((previous) => {
       const next = { ...previous };
 

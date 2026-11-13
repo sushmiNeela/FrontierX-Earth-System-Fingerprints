@@ -239,7 +239,7 @@ export default function RegionalComparison() {
       const uniqueIds = [...new Set(entries)];
       const results: Record<string, ApiResult | null> = {};
 
-      await Promise.all(uniqueIds.map(async (id) => {
+      for (const id of uniqueIds) {
         try {
           const response = await fetch(`${API_BASE}/api/analysis/${id}/trend`);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -247,7 +247,7 @@ export default function RegionalComparison() {
         } catch {
           results[id] = null;
         }
-      }));
+      }
 
       if (!cancelled) {
         setBackendData(results);
