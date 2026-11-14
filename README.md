@@ -334,6 +334,14 @@ Earth-System-Fingerprints/
 └── README.md
 ```
 
+## Explore the Platform
+
+**Earth System Fingerprints** — One Planet. Multiple Signals. A Deeper Understanding of Change.
+
+Experience our interactive Earth-observation platform:
+
+[**🔗 Visit Live Application**](https://frontier-x-earth-system-fingerprint.vercel.app/)
+
 *The structure above represents the intended organization; update it to match the actual repository.*
 
 ## Team
